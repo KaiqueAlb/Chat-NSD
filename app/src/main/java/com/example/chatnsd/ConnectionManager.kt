@@ -67,11 +67,7 @@ class ConnectionManager(application: Application): AndroidViewModel(application)
                 serviceInfo.port = serverPort
 
 
-                nsdManager.registerService(
-                    serviceInfo,
-                    NsdManager.PROTOCOL_DNS_SD,
-                    registrationListener
-                )
+                nsdManager.registerService(serviceInfo, NsdManager.PROTOCOL_DNS_SD, registrationListener)
 
                 Log.d("NSD_LOG", "Servidor iniciado na porta $serverPort")
 

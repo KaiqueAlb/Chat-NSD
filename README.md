@@ -1,161 +1,248 @@
 # Chat NSD
 
-Aplicativo Android desenvolvido em Kotlin com Jetpack Compose para se comunicar com outros dispositos via rede local.
+Aplicativo Android desenvolvido em Kotlin com Jetpack Compose para comunicação entre dispositivos via rede local.
 
 ## Visão Geral
-- Um dispositivo se torna o servidor e mostra o seu serviço para a rede.
-- Outros dispositivos se tornam clientes e se comunicam com o servidor.
-- Interface construída com Material 3.
+- Um dispositivo atua como servidor e anuncia seu serviço na rede.
+- Outros dispositivos atuam como clientes e conectam-se ao servidor encontrado.
+- Interface moderna construída com Material 3.
 
 ## Funcionalidades
-- **Comunicação cliente servidor**: Os dispositivos conseguem se conectar sem um servidor dedicado.
-- **Envio de mensagens**: Os usuarios conseguem enviar mensagens para outros usuarios em tempo real.
-- **Feedback contextualizado**: A interface mostra se à alguem conectado.
-- 
+- **Comunicação Cliente-Servidor**: Conexão direta entre dispositivos sem necessidade de um servidor externo.
+- **Mensageria em Tempo Real**: Envio e recebimento de mensagens instantâneas.
+- **Feedback de Conexão**: Interface reativa que indica o status da conexão e identifica o usuário conectado.
 
 ## Pré-visualizações
-### Abertura da aplicação
-<img src="https://github.com/joaomarcosmb/calculadora-de-combustivel/blob/master/previews/Preview_APP_Opening.png" width="300" height="800">
+### Home
+<img src="Preview/Screenshot_1.jpg" width="300">
 
-### Home (Dark - English)
-<img src="https://github.com/joaomarcosmb/calculadora-de-combustivel/blob/master/previews/Preview_APP_Home_Dark.png" width="300" height="800">
+### Conectar a um servidor (Sem resposta)
+<img src="Preview/Screenshot_2.jpg" width="300">
 
-### Resultado (Dark - English)
-<img src="https://github.com/joaomarcosmb/calculadora-de-combustivel/blob/master/previews/Preview_APP_Home_Dark_Result.png" width="300" height="800">
+### Conectar a um servidor (Com resposta)
+<img src="Preview/Screenshot_3.jpg" width="300">
 
-### Lista de postos (Dark - English)
-<img src="https://github.com/joaomarcosmb/calculadora-de-combustivel/blob/master/previews/Preview_APP_Station_List.jpeg" width="300" height="800">
+### Tela de Chat (Sem conexão)
+<img src="Preview/Screenshot_4.jpg" width="300">
 
-### Edição de infos de um posto (Dark - English)
-<img src="https://github.com/joaomarcosmb/calculadora-de-combustivel/blob/master/previews/Preview_APP_Home_Editing.jpeg" width="300" height="800">
-
-### Deleção de um posto (Dark - English)
-<img src="https://github.com/joaomarcosmb/calculadora-de-combustivel/blob/master/previews/Preview_APP_Delete_Station.jpeg" width="300" height="800">
+### Tela de Chat (Com conexão)
+<img src="Preview/Screenshot_5.jpg" width="300">
 
 ## Stack e Ferramentas
-- Kotlin 2.0.21
-- Jetpack Compose (Material 3 + BOM 2024.09.00)
-- Android Gradle Plugin 8.13.0
-- Minimum SDK 24 | Target SDK 36
-
-## Como Executar
-1. Requisitos: Android Studio Jellyfish | Koala ou superior, SDK 24+, JDK 11.
-2. Clone ou faça download do projeto.
-3. Abra o diretório na IDE e aguarde a sincronização do Gradle.
-4. Execute em um dispositivo/emulador com `Run > Run 'app'` ou use a linha de comando:
-
-
-## Estrutura
-```
-CalculadoradeCombustivel/
-├── app/src/main/java/org/pdm/calculadoradecombustivel/MainActivity.kt
-├── app/src/main/java/org/pdm/calculadoradecombustivel/ui/theme/{Color,Theme,Type}.kt
-├── app/src/main/res/mipmap-*/ic_launcher*.webp
-└── previews/Preview_APP_*.png
-```
+- **Linguagem**: Kotlin 2.0.21
+- **UI**: Jetpack Compose
+- **Build**: AGP 8.13.2
+- **Compatibilidade**: Min SDK 31 | Target SDK 36
 
 > Este projeto foi desenvolvido durante a cadeira de Programação para Dispositivos Móveis (2025.2) do curso de SMD da UFC.
 
-## Avaliação
+## Codigo
 
-### 1. Salvar e restaurar o estado do Switch (0,5 pt)
-O app persiste a opção 70%/75% com Jetpack DataStore: o `LaunchedEffect` restaura o valor salvo e o callback do `Switch` grava novas escolhas. Trecho em `app/src/main/java/org/pdm/calculadoradecombustivel/MainActivity.kt`:
-
+### 1. Register Listener
+Objeto usada para verificar o estado do registro do serviço
 ```kotlin
-LaunchedEffect(dataStore) {
-    dataStore.data.collectLatest { preferences ->
-        val storedUse75 = preferences[FuelPreferencesKeys.use75Percent] ?: false
-        if (use75Percent != storedUse75) {
-            use75Percent = storedUse75
+private val registrationListener = object : NsdManager.RegistrationListener {
+    override fun onServiceRegistered(NsdServiceInfo: NsdServiceInfo) {
+        Log.d("NSD_LOG", "Serviço registrado com sucesso!")
+        Log.d("NSD_LOG", "Nome: ${NsdServiceInfo.serviceName}")
+        Log.d("NSD_LOG", "Tipo: ${NsdServiceInfo.serviceType}")
+        Log.d("NSD_LOG", "Porta: ${NsdServiceInfo.port}")
+
+    }
+
+    override fun onRegistrationFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
+        Log.e("NSD_LOG", "Falha no registro: $errorCode")
+    }
+
+    override fun onServiceUnregistered(arg0: NsdServiceInfo) {}
+    override fun onUnregistrationFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {}
+}
+```
+
+### 2. Service Info
+As informações do serviço são definidas aqui.
+```kotlin
+val serviceInfo = NsdServiceInfo()
+serviceInfo.serviceName = "ChatNSD: $nome"
+serviceInfo.serviceType = SERVICE_TYPE
+serviceInfo.port = serverPort
+```
+
+### 3. Init Server
+Registro do serviço e iniciação do servidor
+```kotlin
+fun InitServerSocket(nome: String?) {
+    viewModelScope.launch(Dispatchers.IO) {
+        try {
+            val serverSocket = ServerSocket(0)
+            val serverPort: Int = serverSocket.localPort
+
+            val serviceInfo = NsdServiceInfo()
+            serviceInfo.serviceName = "ChatNSD: $nome"
+            serviceInfo.serviceType = SERVICE_TYPE
+            serviceInfo.port = serverPort
+
+
+            nsdManager.registerService(serviceInfo, NsdManager.PROTOCOL_DNS_SD, registrationListener)
+
+            Log.d("NSD_LOG", "Servidor iniciado na porta $serverPort")
+
+            socket = serverSocket.accept()
+
+            val saida = PrintWriter(socket?.getOutputStream(),true)
+            saida.println(nome)
+
+            mensageManager(socket)
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }finally {
+            socket?.close()
         }
     }
 }
+```
 
-onSwitchChange = { checked ->
-    use75Percent = checked
-    coroutineScope.launch {
-        dataStore.edit { prefs ->
-            prefs[FuelPreferencesKeys.use75Percent] = checked
+### 4. Discovery Listener
+Objeto usada para verificar o estado da descoberta do serviço
+```kotlin
+private val discoveryListener = object : NsdManager.DiscoveryListener {
+    override fun onDiscoveryStarted(serviceType: String?) {
+        isDiscoveryRunning = true
+        Log.d("NSD_LOG", "Busca iniciada")
+    }
+
+    override fun onDiscoveryStopped(serviceType: String?) {
+        isDiscoveryRunning = false
+
+        Log.i("NSD_LOG", "Busca parada: $serviceType")
+    }
+
+    override fun onServiceFound(serviceInfo: NsdServiceInfo?) {
+        Log.d("NSD_LOG", "Serviço encontrado: ${serviceInfo?.serviceName}")
+        when {
+            serviceInfo?.serviceType != SERVICE_TYPE -> return
+
+            serviceInfo.serviceName.contains("ChatNSD") -> devicesFound.add(serviceInfo)
+        }
+        Log.d("NSD_LOG", "Dispositivos encontrados: ${devicesFound.map{it.serviceName}}")
+    }
+
+    override fun onServiceLost(serviceInfo: NsdServiceInfo?) {
+        Log.e("NSD_LOG", "Serviço perdido: ${serviceInfo?.serviceName}")
+    }
+
+    override fun onStartDiscoveryFailed(serviceType: String?, errorCode: Int) {
+        Log.e("NSD_ERROR", "Discovery falhou: $errorCode")
+        isDiscoveryRunning = false
+    }
+
+    override fun onStopDiscoveryFailed(serviceType: String?, errorCode: Int) {
+        Log.e("NSD_LOG", "Falha na parada da busca: $errorCode")
+        isDiscoveryRunning = false
+    }
+}
+```
+
+### 5. Discovery Service
+Função usada para iniciar a descoberta de serviços
+```kotlin
+fun discoveryService() {
+    devicesFound.clear()
+    if (isDiscoveryRunning) {
+        try {
+            nsdManager.stopServiceDiscovery(discoveryListener)
+        } catch (e: Exception) {
+            Log.d("NSD_LOG", "Erro ao parar busca anterior (ignorado): ${e.message}")
+        }
+        isDiscoveryRunning = false
+    }
+
+    try {
+        nsdManager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
+        isDiscoveryRunning = true
+    } catch (e: Exception) {
+        Log.e("NSD_LOG", "Falha ao iniciar descoberta: ${e.message}")
+        isDiscoveryRunning = false
+    }
+}
+```
+### 5. Connect Device
+Função usada para resolver o serviço e conectar no server
+```kotlin
+fun connectDevice(serviceInfo: NsdServiceInfo, name: String?) {
+        val resolveListener = object : NsdManager.ResolveListener {
+            override fun onResolveFailed(serviceInfo: NsdServiceInfo?, errorCode: Int) {
+                Log.e("NSD_LOG", "Falha no resolve: $errorCode")
+            }
+
+            override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
+                viewModelScope.launch(Dispatchers.IO) {
+                    try {
+                        Log.d("NSD_LOG", "Serviço resolvido: ${serviceInfo.serviceName}")
+
+                        val host = serviceInfo.host
+                        val port: Int = serviceInfo.port
+
+                        socket = Socket(host, port)
+                        val saida = PrintWriter(socket?.getOutputStream(),true)
+
+                        saida.println(name)
+
+                        Log.d("NSD_LOG", "Conexão estabelecida com ${serviceInfo.serviceName}, Port: $port, Host: $host")
+
+                        mensageManager(socket)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+        }
+        nsdManager.resolveService(serviceInfo, resolveListener)
+    }
+```
+### 5. Mensage Manager e Send Message
+Funções para o tratamento de mensagens (Estuta e envio)
+```kotlin
+suspend fun mensageManager(socket: Socket?){
+    withContext(Dispatchers.IO){
+        try {
+            val entrada = BufferedReader(InputStreamReader(socket?.getInputStream()))
+
+            while (socket?.isConnected == true && !socket.isClosed){
+                val readLine = entrada.readLine() ?: break
+                Log.d("NSD_LOG", "Mensagem recebida: $readLine")
+                if(firstMensage){
+                    firstMensage = false
+                    withContext(Dispatchers.Main){
+                        clientName = readLine
+                    }
+
+                }else{
+                    withContext(Dispatchers.Main){
+                        messageList.add(Message(readLine,false))
+                    }
+                }
+            }
+        }catch (e: Exception){
+            e.printStackTrace()
+        }
+
+    }
+}
+
+fun sendMessage(message: String) {
+    viewModelScope.launch(Dispatchers.IO) {
+        try {
+            val sendMessage = PrintWriter(socket?.outputStream, true)
+            sendMessage.println(message)
+
+            withContext(Dispatchers.Main) {
+                messageList.add(Message(message, true))
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 }
 ```
-
-### 2. CRUD de valores de combustível (2,5 pt)
-`GasStation` é salvo, editado e excluído mantendo até 10 registros. A lista em memória reflete o armazenamento (JSON dentro do DataStore, que cumpre o papel requisitado para SharedPreferences). Principais funções em `MainActivity.kt`:
-
-```kotlin
-val savedStations = remember { mutableStateListOf<GasStation>() }
-
-fun persistStations() {
-    dataStore.edit { prefs ->
-        prefs[FuelPreferencesKeys.stations] = savedStations.toJsonStorage()
-    }
-}
-
-fun saveStation() { /* validação, add/update + persistStations() */ }
-
-fun startEditing(station: GasStation) { /* carrega dados no formulário */ }
-
-fun deleteStation(station: GasStation) {
-    savedStations.removeAt(index)
-    persistStations()
-}
-```
-
-### 3. Lista de postos com detalhes (3 pt)
-`StationListScreen` renderiza uma `LazyColumn` com nome, valores e ações para editar/excluir. Ao tocar, abre diálogo para mapa ou edição. Código em `app/src/main/java/org/pdm/calculadoradecombustivel/StationListScreen.kt`:
-
-```kotlin
-LazyColumn(...) {
-    items(stations, key = { it.id }) { station ->
-        Card(Modifier.clickable { onStationClick(station) }) {
-            Text(text = station.name)
-            Text(text = stringResource(R.string.list_alcohol_price, formatCurrencyBR(station.alcoholPrice)))
-            Text(text = stringResource(R.string.list_gasoline_price, formatCurrencyBR(station.gasolinePrice)))
-            IconButton(onClick = { onEdit(station) }) { ... }
-            IconButton(onClick = { onDelete(station) }) { ... }
-        }
-    }
-}
-```
-
-### 4. Localização e exibição no mapa (2 pt)
-`MainActivity.kt` solicita permissão, usa `FusedLocationProviderClient` para capturar a latitude/longitude e oferece Intent para abrir o posto no Maps:
-
-```kotlin
-val permissionLauncher = rememberLauncherForActivityResult(RequestPermission()) { isGranted ->
-    if (isGranted) requestCurrentLocation() else showLocationError(...)
-}
-
-@RequiresPermission(...) fun requestCurrentLocation() {
-    fusedLocationClient.getCurrentLocation(...).addOnSuccessListener { location ->
-        updateLocationFromCoordinates(location.latitude, location.longitude)
-    }
-}
-
-fun openStationInMaps(station: GasStation) {
-    val geoUri = "geo:0,0?q=${Uri.encode(locationText)}".toUri()
-    context.startActivity(Intent(Intent.ACTION_VIEW, geoUri))
-}
-```
-
-### 5. Suporte a internacionalização (2 pt)
-Há dois conjuntos de strings localizadas (`values/strings.xml` e `values-en/strings.xml`), cobrindo todo o texto exibido:
-
-```xml
-<!-- values/strings.xml -->
-<string name="home_title">Calculadora de Combustível</string>
-
-<!-- values-en/strings.xml -->
-<string name="home_title">Fuel Calculator</string>
-```
-
-As traduções são aplicadas automaticamente via `stringResource(...)`, respeitando o idioma configurado no sistema.
-
-Além disso, o app segue boas práticas completas de i18n:
-
-- **Nenhum texto hard-coded** nos Composables — todo conteúdo textual encontra-se em recursos traduzíveis.
-- **Formatação numérica compatível com região**, utilizando `NumberFormat.getInstance(Locale.getDefault())` para garantir separador decimal correto em cada idioma.
-- **Arquitetura preparada para novas traduções**, permitindo adicionar facilmente `values-es/`, `values-fr/` e outros idiomas sem alterar o código.
-- **Suporte natural à mudança de idioma do sistema**: ao trocar a linguagem no Android, o Compose recompõe a interface e exibe a tradução correspondente.
