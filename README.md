@@ -167,7 +167,7 @@ fun discoveryService() {
     }
 }
 ```
-### 5. Connect Device
+### 6. Connect Device
 Função usada para resolver o serviço e conectar no server
 ```kotlin
 fun connectDevice(serviceInfo: NsdServiceInfo, name: String?) {
@@ -201,10 +201,10 @@ fun connectDevice(serviceInfo: NsdServiceInfo, name: String?) {
         nsdManager.resolveService(serviceInfo, resolveListener)
     }
 ```
-### 5. Mensage Manager e Send Message
+### 7. Menssage Manager e Send Message
 Funções para o tratamento de mensagens (Estuta e envio)
 ```kotlin
-suspend fun mensageManager(socket: Socket?){
+suspend fun menssageManager(socket: Socket?){
     withContext(Dispatchers.IO){
         try {
             val entrada = BufferedReader(InputStreamReader(socket?.getInputStream()))
@@ -212,8 +212,8 @@ suspend fun mensageManager(socket: Socket?){
             while (socket?.isConnected == true && !socket.isClosed){
                 val readLine = entrada.readLine() ?: break
                 Log.d("NSD_LOG", "Mensagem recebida: $readLine")
-                if(firstMensage){
-                    firstMensage = false
+                if(firstMenssage){
+                    firstMenssage = false
                     withContext(Dispatchers.Main){
                         clientName = readLine
                     }
